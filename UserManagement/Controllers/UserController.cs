@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using UserManagement.Data;
 using UserManagement.Models;
+using UserManagement.Validation;
 
 
 namespace UserManagement.Controllers
@@ -24,18 +25,17 @@ namespace UserManagement.Controllers
 
             try
             {
+                Encryption encryption = new Encryption();
+                string Encrypt = encryption.Encrypt(user.Password);
 
-                HashSet<char> specialCharacters = new HashSet<char>() { '%', '$', '#', '@', '.', '&' };
-                if (user.Password.Any(char.IsLower) &&
-                     user.Password.Any(char.IsUpper) &&
-                     user.Password.Any(char.IsDigit) &&
-                    user.Password.Any(specialCharacters.Contains))
+                validation validationcheck = new validation();
+                bool validpass = validationcheck.IsValidPassword(user.Password);
+                if (validpass)
                 {
-
                     var foundData = await _context.Users.FirstOrDefaultAsync(x => x.Email == user.Email || x.PhoneNumber == user.PhoneNumber);
                     if (foundData == null)
                     {
-                        user.Password = Encrypt(user.Password);
+                        user.Password = Encrypt;
                         _context.Users.Add(user);
 
                         await _context.SaveChangesAsync();
@@ -43,8 +43,14 @@ namespace UserManagement.Controllers
                         return Ok(user);
                     }
                     return NotFound("User with this Email or PhoneNumber already exists.");
+
                 }
-                return BadRequest("Password must contain atleast one Uppercase, a Digit and one SpecialCharacter.");
+                else
+                {
+                    return BadRequest("Password must contain atleast one Uppercase, a Digit and one SpecialCharacter.");
+
+                }
+
             }
             catch (Exception e)
             {
@@ -63,28 +69,8 @@ namespace UserManagement.Controllers
             return Ok(foundData);
 
         }
-        private string Encrypt(string clearText)
-        {
-            string encryptionKey = "MAKV2SPBNI99212hgvfy";
-            byte[] clearBytes = Encoding.Unicode.GetBytes(clearText);
-            using (Aes encryptor = Aes.Create())
-            {
-                Rfc2898DeriveBytes pdb = new Rfc2898DeriveBytes(encryptionKey, new byte[] { 0x49, 0x76, 0x61, 0x6e, 0x20, 0x4d, 0x65, 0x64, 0x76, 0x65, 0x64, 0x65, 0x76 });
-                encryptor.Key = pdb.GetBytes(32);
-                encryptor.IV = pdb.GetBytes(16);
-                using (MemoryStream ms = new MemoryStream())
-                {
-                    using (CryptoStream cs = new CryptoStream(ms, encryptor.CreateEncryptor(), CryptoStreamMode.Write))
-                    {
-                        cs.Write(clearBytes, 0, clearBytes.Length);
-                        cs.Close();
-                    }
-                    clearText = Convert.ToBase64String(ms.ToArray());
-                }
-            }
 
-            return clearText;
-        }
+
 
     }
 }
